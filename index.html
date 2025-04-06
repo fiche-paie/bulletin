@@ -64,11 +64,11 @@
         <label for="posteOccupe">Poste Occupé</label>
         <input type="text" id="posteOccupe" value="Développeur Web">
         <h2>Période et Salaire</h2>
-        <label for="mois">Mois (ex: 01 pour janvier)</label>
-        <input type="text" id="mois" value="01">
-        <label for="annee">Année</label>
-        <input type="text" id="annee" value="2025">
-        <label for="salaireBrut">Salaire Brut</label>
+        <label for="dateDebut">Date de début de période (JJ/MM/AAAA)</label>
+        <input type="text" id="dateDebut" value="01/01/2025">
+        <label for="dateFin">Date de fin de période (JJ/MM/AAAA)</label>
+        <input type="text" id="dateFin" value="31/01/2025">
+        <label for="salaireBrut">Salaire Brut Mensuel</label>
         <input type="text" id="salaireBrut" value="2778.98">
         <label for="statutMarital">Statut marital</label>
         <select id="statutMarital">
@@ -103,8 +103,8 @@
                     "secuSalarie",
                     "dateEntree",
                     "posteOccupe",
-                    "mois",
-                    "annee",
+                    "dateDebut",
+                    "dateFin",
                     "salaireBrut",
                     "statutMarital",
                     "nbEnfants"
@@ -140,6 +140,18 @@
                     alert("La date d'entrée doit être au format JJ/MM/AAAA.");
                     return false;
                 }
+                // Validation Date de début
+                const dateDebut = document.getElementById("dateDebut").value;
+                if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateDebut)) {
+                    alert("La date de début doit être au format JJ/MM/AAAA.");
+                    return false;
+                }
+                // Validation Date de fin
+                const dateFin = document.getElementById("dateFin").value;
+                if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateFin)) {
+                    alert("La date de fin doit être au format JJ/MM/AAAA.");
+                    return false;
+                }
                 // Validation Salaire Brut
                 const salaireBrut = parseFloat(document.getElementById("salaireBrut").value);
                 if (isNaN(salaireBrut) || salaireBrut <= 0) {
@@ -164,6 +176,17 @@
                     ans: diffYears,
                     mois: Math.abs(diffMonths + (diffDays < 0 ? -1 : 0))
                 };
+            }
+
+            // Calcul des jours travaillés
+            function calculerJoursTravailles(dateDebut, dateFin) {
+                const [dayStart, monthStart, yearStart] = dateDebut.split("/").map(Number);
+                const [dayEnd, monthEnd, yearEnd] = dateFin.split("/").map(Number);
+                const debut = new Date(yearStart, monthStart - 1, dayStart);
+                const fin = new Date(yearEnd, monthEnd - 1, dayEnd);
+                const diffTime = Math.abs(fin - debut);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusif
+                return diffDays;
             }
 
             // Calcul de l'impôt sur le revenu
@@ -207,44 +230,52 @@
                 const secuSalarie = document.getElementById("secuSalarie").value.replace(/\s/g, "");
                 const dateEntree = document.getElementById("dateEntree").value;
                 const posteOccupe = document.getElementById("posteOccupe").value;
-                const mois = document.getElementById("mois").value.padStart(2, '0');
-                const annee = document.getElementById("annee").value;
-                const salaireBrut = parseFloat(document.getElementById("salaireBrut").value);
+                const dateDebut = document.getElementById("dateDebut").value;
+                const dateFin = document.getElementById("dateFin").value;
+                const salaireBrutMensuel = parseFloat(document.getElementById("salaireBrut").value);
                 const statutMarital = parseInt(document.getElementById("statutMarital").value);
                 const nbEnfants = parseInt(document.getElementById("nbEnfants").value);
 
                 // Calculs
                 const anciennete = calculerAnciennete(dateEntree);
+
+                // Extraction du mois et de l'année à partir de la date de début
+                const [jourDebut, mois, annee] = dateDebut.split("/").map(Number);
+                const joursDansLeMois = new Date(annee, mois, 0).getDate(); // Nombre total de jours dans le mois
+                const joursTravailles = calculerJoursTravailles(dateDebut, dateFin);
+                const salaireBrutProrata = (salaireBrutMensuel / joursDansLeMois) * joursTravailles;
+
                 const cotisations = {
                     salariales: {
-                        maladie: salaireBrut * 0.0075,
-                        vieillessePlafonnee: salaireBrut * 0.069,
-                        vieillesseDeplafonnee: salaireBrut * 0.004,
-                        retraiteComplementaireTranche1: salaireBrut * 0.0315,
-                        retraiteComplementaireTranche2: salaireBrut * 0.009,
-                        chomage: salaireBrut * 0.024,
-                        csgDeductible: salaireBrut * 0.068,
-                        csgNonDeductible: salaireBrut * 0.029
+                        maladie: salaireBrutProrata * 0.0075,
+                        vieillessePlafonnee: salaireBrutProrata * 0.069,
+                        vieillesseDeplafonnee: salaireBrutProrata * 0.004,
+                        retraiteComplementaireTranche1: salaireBrutProrata * 0.0315,
+                        retraiteComplementaireTranche2: salaireBrutProrata * 0.009,
+                        chomage: salaireBrutProrata * 0.024,
+                        csgDeductible: salaireBrutProrata * 0.068,
+                        csgNonDeductible: salaireBrutProrata * 0.029
                     },
                     patronales: {
-                        maladie: salaireBrut * 0.13,
-                        vieillessePlafonnee: salaireBrut * 0.0855,
-                        vieillesseDeplafonnee: salaireBrut * 0.018,
-                        retraiteComplementaireTranche1: salaireBrut * 0.08,
-                        retraiteComplementaireTranche2: salaireBrut * 0.016,
-                        chomage: salaireBrut * 0.04,
-                        formationProfessionnelle: salaireBrut * 0.01,
-                        taxeApprentissage: salaireBrut * 0.0068,
-                        versementMobilite: salaireBrut * 0.01,
-                        ags: salaireBrut * 0.0015
+                        maladie: salaireBrutProrata * 0.13,
+                        vieillessePlafonnee: salaireBrutProrata * 0.0855,
+                        vieillesseDeplafonnee: salaireBrutProrata * 0.018,
+                        retraiteComplementaireTranche1: salaireBrutProrata * 0.08,
+                        retraiteComplementaireTranche2: salaireBrutProrata * 0.016,
+                        chomage: salaireBrutProrata * 0.04,
+                        formationProfessionnelle: salaireBrutProrata * 0.01,
+                        taxeApprentissage: salaireBrutProrata * 0.0068,
+                        versementMobilite: salaireBrutProrata * 0.01,
+                        ags: salaireBrutProrata * 0.0015
                     }
                 };
+
                 const totalSalarial = Object.values(cotisations.salariales).reduce((acc, val) => acc + val, 0);
                 const totalPatronal = Object.values(cotisations.patronales).reduce((acc, val) => acc + val, 0);
-                const netImposable = salaireBrut - cotisations.salariales.csgDeductible - totalSalarial + cotisations.salariales.csgNonDeductible;
+                const netImposable = salaireBrutProrata - cotisations.salariales.csgDeductible - totalSalarial + cotisations.salariales.csgNonDeductible;
                 const nbParts = statutMarital + (nbEnfants > 0 ? Math.min(nbEnfants, 3) * 0.5 : 0);
                 const impotRevenu = calculerImpot(netImposable * 12, nbParts) / 12;
-                const netAPayer = salaireBrut - totalSalarial - impotRevenu;
+                const netAPayer = salaireBrutProrata - totalSalarial - impotRevenu;
 
                 // Génération du PDF
                 const doc = new jsPDF();
@@ -267,8 +298,8 @@
                     `Email : ${emailEntreprise}`
                 ];
                 const yEntrepriseStart = 30;
-                const yEntrepriseHeight = 45; // Hauteur ajustée pour inclure le fax
-                doc.setFillColor(230, 245, 255); // Couleur de fond uniforme
+                const yEntrepriseHeight = 45;
+                doc.setFillColor(230, 245, 255);
                 doc.roundedRect(15, yEntrepriseStart, 85, yEntrepriseHeight, 3, 3, "F");
                 let yPositionEntreprise = yEntrepriseStart + (yEntrepriseHeight / 2) - ((infosEntreprise.length * 4) / 2);
                 infosEntreprise.forEach((line) => {
@@ -288,8 +319,8 @@
                     `Email : ${emailSalarie}`
                 ];
                 const ySalarieStart = 30;
-                const ySalarieHeight = 45; // Hauteur ajustée pour inclure le poste occupé
-                doc.setFillColor(230, 245, 255); // Couleur de fond uniforme
+                const ySalarieHeight = 45;
+                doc.setFillColor(230, 245, 255);
                 doc.roundedRect(110, ySalarieStart, 85, ySalarieHeight, 3, 3, "F");
                 let yPositionSalarie = ySalarieStart + (ySalarieHeight / 2) - ((infosSalarie.length * 4) / 2);
                 infosSalarie.forEach((line) => {
@@ -303,12 +334,13 @@
                 doc.setFontSize(10);
                 doc.text("Période :", 105, yPositionEntreprise + 18, { align: 'center' });
                 doc.setFontSize(9);
-                doc.text(`01/${mois}/${annee} au 31/${mois}/${annee}`, 105, yPositionEntreprise + 24, { align: 'center' });
+                doc.text(`${dateDebut} au ${dateFin}`, 105, yPositionEntreprise + 24, { align: 'center' });
                 doc.setFont(undefined, 'normal');
 
                 // Tableau des cotisations
                 const lignesPaie = [
-                    ["SALAIRE BRUT", "", "", salaireBrut.toFixed(2), "", ""],
+                    ["SALAIRE BRUT MENSUEL", "", "", salaireBrutMensuel.toFixed(2), "", ""], // Nouvelle ligne
+                    ["SALAIRE BRUT PRORATA", "", "", salaireBrutProrata.toFixed(2), "", ""], // Affichage du salaire brut ajusté
                     ["COTISATIONS SALARIALES", "", "", "", "", ""],
                     ["Maladie - maternité - invalidité - décès", "", "0.75%", cotisations.salariales.maladie.toFixed(2), "", ""],
                     ["Assurance vieillesse plafonnée", "", "6.9%", cotisations.salariales.vieillessePlafonnee.toFixed(2), "", ""],
@@ -319,7 +351,7 @@
                     ["CSG déductible", "", "6.8%", cotisations.salariales.csgDeductible.toFixed(2), "", ""],
                     ["CSG/CRDS non déductible", "", "2.9%", cotisations.salariales.csgNonDeductible.toFixed(2), "", ""],
                     ["Impôt sur le revenu prélevé à la source", "", "", impotRevenu.toFixed(2), "", ""],
-                    ["CONGÉS PAYÉS (10%)", "", "10%", (salaireBrut * 0.1).toFixed(2), "", ""],
+                    ["CONGÉS PAYÉS (10%)", "", "10%", (salaireBrutProrata * 0.1).toFixed(2), "", ""],
                     ["", "", "TOTAL SALARIAL", totalSalarial.toFixed(2), "", ""],
                     ["COTISATIONS PATRONALES", "", "", "", "", ""],
                     ["Maladie - maternité - invalidité - décès", "", "13%", "", "", cotisations.patronales.maladie.toFixed(2)],
@@ -355,13 +387,13 @@
                     margin: { left: startX, right: startX },
                     styles: {
                         fontSize: 7,
-                        cellPadding: 1.5,
+                        cellPadding: 1.42,
                         overflow: 'linebreak',
                         minCellHeight: 4,
                         halign: 'left'
                     },
                     headStyles: {
-                        fillColor: [230, 245, 255], // Couleur de fond uniforme
+                        fillColor: [230, 245, 255],
                         textColor: [0, 0, 0],
                         fontSize: 7,
                         cellPadding: 2,
